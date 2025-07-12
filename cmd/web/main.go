@@ -8,11 +8,12 @@ import (
 	"os"
 
 	_ "github.com/go-sql-driver/mysql"
+	"hilgardvr.com/snippetbox/internal/models"
 )
 
 type application struct {
-	logger *slog.Logger
-	db     *sql.DB
+	logger   *slog.Logger
+	snippets *models.SnippetModel
 }
 
 func main() {
@@ -33,8 +34,8 @@ func main() {
 	defer db.Close()
 
 	app := &application{
-		logger: logger,
-		db:     db,
+		logger:   logger,
+		snippets: &models.SnippetModel{DB: db},
 	}
 
 	mux := app.routes()

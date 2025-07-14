@@ -11,6 +11,13 @@ import (
 	"hilgardvr.com/snippetbox/internal/models"
 )
 
+type snippetCreateForm struct {
+	Title       string
+	Content     string
+	Expires     int
+	FieldErrors map[string]string
+}
+
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	snippets, err := app.snippets.Latest()
 	if err != nil {
@@ -44,6 +51,9 @@ func (app *application) snippetView(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) snippetCreateGet(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
+	data.Form = snippetCreateForm{
+		Expires: 365,
+	}
 	app.render(w, r, http.StatusOK, "create.html", data)
 }
 
@@ -60,21 +70,27 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	fieldErrors := make(map[string]string)
+	form := snippetCreateForm{
+		Title:       title,
+		Content:     content,
+		Expires:     expires,
+		FieldErrors: map[string]string{},
+	}
 	if strings.TrimSpace(title) == "" {
-		fieldErrors["title"] = "this field cannot be blank"
+		form.FieldErrors["title"] = "this field cannot be blank"
 	} else if utf8.RuneCountInString(title) > 100 {
-		fieldErrors["title"] = "this field cannot be more than 100 characters long"
+		form.FieldErrors["title"] = "this field cannot be more than 100 characters long"
 	}
 	if strings.TrimSpace(content) == "" {
-		fieldErrors["content"] = "this field cannot be blank"
+		form.FieldErrors["content"] = "this field cannot be blank"
 	}
 	if expires != 1 && expires != 7 && expires != 365 {
-		fieldErrors["expires"] = "this field must equal 1, 7, 365"
+		form.FieldErrors["expires"] = "this field must equal 1, 7, 365"
 	}
-	if len(fieldErrors) > 0 {
-		fmt.Fprint(w, fieldErrors)
-		return
+	if len(form.FieldErrors) > 0 {
+		data := app.newTemplateData(r)
+		data.Form = form
+		app.render(w, r, http.StatusUnprocessableEntity, "create.html", data)
 	}
 	id, err := app.snippets.Insert(title, content, expires)
 	if err != nil {

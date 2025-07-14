@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
-	"unicode/utf8"
 
 	"hilgardvr.com/snippetbox/internal/models"
+	"hilgardvr.com/snippetbox/internal/validator"
 )
 
 type snippetCreateForm struct {
-	Title       string
-	Content     string
-	Expires     int
-	FieldErrors map[string]string
+	Title   string
+	Content string
+	Expires int
+	validator.Validator
 }
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
@@ -71,26 +70,19 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 	form := snippetCreateForm{
-		Title:       title,
-		Content:     content,
-		Expires:     expires,
-		FieldErrors: map[string]string{},
+		Title:   title,
+		Content: content,
+		Expires: expires,
 	}
-	if strings.TrimSpace(title) == "" {
-		form.FieldErrors["title"] = "this field cannot be blank"
-	} else if utf8.RuneCountInString(title) > 100 {
-		form.FieldErrors["title"] = "this field cannot be more than 100 characters long"
-	}
-	if strings.TrimSpace(content) == "" {
-		form.FieldErrors["content"] = "this field cannot be blank"
-	}
-	if expires != 1 && expires != 7 && expires != 365 {
-		form.FieldErrors["expires"] = "this field must equal 1, 7, 365"
-	}
-	if len(form.FieldErrors) > 0 {
+	form.CheckField(validator.NotBlank(form.Title), "title", "this field cannot be blank")
+	form.CheckField(validator.MaxChars(form.Title, 100), "title", "this field cannot be more than 100 characters long")
+	form.CheckField(validator.NotBlank(form.Content), "content", "this field cannot be blank")
+	form.CheckField(validator.PermittedValue(form.Expires, 1, 7, 365), "expires", "this field must equal 1, 7, 365")
+	if !form.Valid() {
 		data := app.newTemplateData(r)
 		data.Form = form
 		app.render(w, r, http.StatusUnprocessableEntity, "create.html", data)
+		return
 	}
 	id, err := app.snippets.Insert(title, content, expires)
 	if err != nil {
